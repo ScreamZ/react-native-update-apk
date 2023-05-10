@@ -1,4 +1,8 @@
-interface AppSpecification{firstInstallTime: string, lastUpdateTime: string, name: string}
+interface AppSpecification {
+  firstInstallTime: string;
+  lastUpdateTime: string;
+  name: string;
+}
 
 export function getApps(): Promise<Array<AppSpecification>>;
 export function getNonSystemApps(): Promise<Array<AppSpecification>>;
@@ -39,6 +43,11 @@ export type UpdateAPKConstructorArgs = {
    * @see https://support.google.com/admob/answer/10038409
    */
   iosAppId?: string;
+
+  /**
+   * Whether the device is rooted, this way we can force update without asking the user.
+   */
+  rootInstall: boolean;
 
   /**
    * The URL to the remote JSON file that contains the latest version information.

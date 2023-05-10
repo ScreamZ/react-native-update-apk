@@ -20,7 +20,9 @@ import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 
 import java.io.ByteArrayInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.security.MessageDigest;
@@ -169,36 +171,37 @@ public class RNUpdateAPK extends ReactContextBaseJavaModule {
         }
     }
 
-     public void rootInstallApk(File file, Promise p) {
-         String cmd = "chmod 777 " + file;
+     public void rootInstallApk(File file, Promise promise) {
          try {
-             Runtime.getRuntime().exec(cmd);
-         } catch (Exception e) {
-             p.reject(e);
+             // Verify device is rooted
+             Process suProcess = Runtime.getRuntime().exec("su");
+             DataOutputStream outputStream = new DataOutputStream(suProcess.getOutputStream());
+             outputStream.writeBytes("exit\n");
+             outputStream.flush();
+             int suProcessExitValue = suProcess.waitFor();
+             if (suProcessExitValue != 0) {
+                 promise.reject(new Exception("Device is not rooted"));
+                 return;
+             }
+
+             // Install APK as root
+             String command = "pm install -r " + file.getAbsolutePath() + "; reboot";
+             suProcess = Runtime.getRuntime().exec("su");
+             outputStream = new DataOutputStream(suProcess.getOutputStream());
+             outputStream.writeBytes(command + "\n");
+             outputStream.flush();
+             suProcessExitValue = suProcess.waitFor();
+             if (suProcessExitValue != 0) {
+                 promise.reject(new Exception("APK installation failed"));
+                 return;
+             }
+
+             // APK installation successful
+             promise.resolve(true);
+         } catch (IOException | InterruptedException e) {
+             promise.reject(e);
          }
-
-        PrintWriter printWriter;
-        Process process = null;
-        Map<String, Object> constants = this.getConstants();
-        Log.i("RNUpdateAPK", "rootInstallApk: " + file.toString() + " " + constants.get("packageName"));
-
-        try {
-            process = Runtime.getRuntime().exec("su");
-            printWriter = new PrintWriter(process.getOutputStream());
-            printWriter.println("pm install -r " + file.toString()+"; reboot");
-            String packageName = (String) constants.get("packageName");
-           // printWriter.println("pm install -r " + file.toString()+"; am start -n "+packageName+"/.MainActivity");
-            printWriter.flush();
-            printWriter.close();
-            process.waitFor();
-        } catch (Exception e) {
-            p.reject(e);
-        } finally {
-            if (process != null){
-                process.destroy();
-            }
-        }
-    }
+     }
 
     @ReactMethod
     public void getApps(Promise p) {
