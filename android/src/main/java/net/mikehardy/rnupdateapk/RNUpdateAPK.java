@@ -22,6 +22,7 @@ import com.facebook.react.bridge.WritableMap;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.security.MessageDigest;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -122,12 +123,18 @@ public class RNUpdateAPK extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void installApk(String filePath, String fileProviderAuthority) {
+    public void installApk(String filePath, String fileProviderAuthority, boolean isRootInstall, Promise p) {
 
         File file = new File(filePath);
         if (!file.exists()) {
             Log.e("RNUpdateAPK", "installApk: file doe snot exist '" + filePath + "'");
-            // FIXME this should take a promise and fail it
+            p.reject("file doe snot exist '" + filePath + "'");
+            return;
+        }
+
+        Log.i("RNUpdateAPK", "IsRootInstall ?" + isRootInstall);
+        if (isRootInstall) {
+            rootInstallApk(file, p);
             return;
         }
 
@@ -159,6 +166,37 @@ public class RNUpdateAPK extends ReactContextBaseJavaModule {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.setDataAndType(Uri.parse("file://" + file), "application/vnd.android.package-archive");
             reactContext.startActivity(intent);
+        }
+    }
+
+     public void rootInstallApk(File file, Promise p) {
+         String cmd = "chmod 777 " + file;
+         try {
+             Runtime.getRuntime().exec(cmd);
+         } catch (Exception e) {
+             p.reject(e);
+         }
+
+        PrintWriter printWriter;
+        Process process = null;
+        Map<String, Object> constants = this.getConstants();
+        Log.i("RNUpdateAPK", "rootInstallApk: " + file.toString() + " " + constants.get("packageName"));
+
+        try {
+            process = Runtime.getRuntime().exec("su");
+            printWriter = new PrintWriter(process.getOutputStream());
+            printWriter.println("pm install -r " + file.toString()+"; reboot");
+            String packageName = (String) constants.get("packageName");
+           // printWriter.println("pm install -r " + file.toString()+"; am start -n "+packageName+"/.MainActivity");
+            printWriter.flush();
+            printWriter.close();
+            process.waitFor();
+        } catch (Exception e) {
+            p.reject(e);
+        } finally {
+            if (process != null){
+                process.destroy();
+            }
         }
     }
 

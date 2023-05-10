@@ -146,10 +146,16 @@ export class UpdateAPK {
             // re-throw so we don't attempt to install the APK, this will call the downloadApkError handler
             throw rej;
           });
+        console.log("Will install from " + downloadDestPath, this.options.fileProviderAuthority, this.options.rootInstall)
         RNUpdateAPK.installApk(
           downloadDestPath,
-          this.options.fileProviderAuthority
-        );
+          this.options.fileProviderAuthority,
+          this.options.rootInstall
+        ).then(() => console.log("Install success")).catch(err => { 
+          console.log("RNUpdateAPK::installApk - error: ", err);
+          this.options.onError && this.options.onError(err);
+          throw err
+        })
 
         jobId = -1;
       })
