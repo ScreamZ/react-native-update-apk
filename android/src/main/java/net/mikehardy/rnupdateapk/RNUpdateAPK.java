@@ -130,7 +130,7 @@ public class RNUpdateAPK extends ReactContextBaseJavaModule {
         File file = new File(filePath);
         if (!file.exists()) {
             Log.e("RNUpdateAPK", "installApk: file doe snot exist '" + filePath + "'");
-            p.reject("file doe snot exist '" + filePath + "'");
+            p.reject(new Exception("file doe snot exist '" + filePath + "'"));
             return;
         }
 
@@ -171,37 +171,34 @@ public class RNUpdateAPK extends ReactContextBaseJavaModule {
         }
     }
 
-     public void rootInstallApk(File file, Promise promise) {
-         try {
-             // Verify device is rooted
-             Process suProcess = Runtime.getRuntime().exec("su");
-             DataOutputStream outputStream = new DataOutputStream(suProcess.getOutputStream());
-             outputStream.writeBytes("exit\n");
-             outputStream.flush();
-             int suProcessExitValue = suProcess.waitFor();
-             if (suProcessExitValue != 0) {
-                 promise.reject(new Exception("Device is not rooted"));
-                 return;
-             }
+    public void rootInstallApk(File file, Promise promise) {
+        String cmd = "chmod 777 " + file;
+        try {
+            Runtime.getRuntime().exec(cmd);
+        } catch (Exception e) {
+            promise.reject(e);
+        }
 
-             // Install APK as root
-             String command = "pm install -r " + file.getAbsolutePath() + "; reboot";
-             suProcess = Runtime.getRuntime().exec("su");
-             outputStream = new DataOutputStream(suProcess.getOutputStream());
-             outputStream.writeBytes(command + "\n");
-             outputStream.flush();
-             suProcessExitValue = suProcess.waitFor();
-             if (suProcessExitValue != 0) {
-                 promise.reject(new Exception("APK installation failed"));
-                 return;
-             }
+       PrintWriter printWriter;
+       Process process = null;
 
-             // APK installation successful
-             promise.resolve(true);
-         } catch (IOException | InterruptedException e) {
-             promise.reject(e);
-         }
-     }
+       try {
+           process = Runtime.getRuntime().exec("su");
+           printWriter = new PrintWriter(process.getOutputStream());
+           printWriter.println("pm install -r " + file.toString()+"; reboot");
+
+           // printWriter.println("pm install -r " + file.toString()+"; am start -n "+packageName+"/.MainActivity");
+           printWriter.flush();
+           printWriter.close();
+           process.waitFor();
+       } catch (Exception e) {
+           promise.reject(e);
+       } finally {
+           if (process != null){
+               process.destroy();
+           }
+       }
+   }
 
     @ReactMethod
     public void getApps(Promise p) {
